@@ -24,9 +24,10 @@ export interface Room {
   openNights: number; daysInMonth: number; bookedThisWeek: number;
 }
 export interface Booking {
-  id: string; ref: string; guest: string; email: string; room: string; roomId: string;
+  id: string; ref: string; guest: string; email: string; phone: string; room: string; roomId: string;
   stay: string; checkin: string; checkout: string; nights: number; adults: number; children: number;
   total: number; status: string; baseStatus: string; color: string; source: string; bookedBy: string; payment: string; notes: string;
+  createdAt: string;
 }
 export interface Overview {
   today: string;
