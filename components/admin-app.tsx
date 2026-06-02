@@ -57,7 +57,7 @@ function SidebarBody({ user, tab, setTab, onSignOut }: { user: AuthUser; tab: st
         })}
       </nav>
       <div style={{ marginTop: "auto", padding: "20px 24px 0", borderTop: "1px solid #2A2722", display: "flex", flexDirection: "column", gap: 14 }}>
-        <a href="http://localhost:3000" target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#A6A099" }}>
+        <a href={process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000"} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#A6A099" }}>
           <Icons.Globe size={14} stroke={1.6} /> View booking site
         </a>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
