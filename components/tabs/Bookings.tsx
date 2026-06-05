@@ -12,6 +12,11 @@ export function Bookings({ openModal, reload }: { openModal: (t: string) => void
   const [channel, setChannel] = useState<"all" | "online" | "manual">("all");
   const [search, setSearch] = useState("");
   const [roomFilter, setRoomFilter] = useState("all");
+  // Default to newest-booked-first so a reservation that just came in is the
+  // first row Anna sees, not buried under months of old check-ins.
+  const [sort, setSort] = useState<"booked" | "checkin" | "checkin-desc">("booked");
+  const [from, setFrom] = useState(""); // stay-date range filter (ISO yyyy-mm-dd)
+  const [to, setTo] = useState("");
   const [detail, setDetail] = useState<Booking | null>(null);
   const load = () => api.bookings().then(setData).catch(() => {});
   useEffect(() => { load(); }, [reload]);
@@ -29,12 +34,18 @@ export function Bookings({ openModal, reload }: { openModal: (t: string) => void
   const passChannel = (b: Booking) => channel === "all" || channelOf(b) === channel;
   const passRoom = (b: Booking) => roomFilter === "all" || b.room === roomFilter;
   const passStatus = (b: Booking) => filter === "all" || cat(b) === filter;
-  const filtered = all.filter((b) => passSearch(b) && passChannel(b) && passRoom(b) && passStatus(b));
-  const pg = usePaged(filtered, 10);
+  // A booking passes the date range when its stay overlaps it (ISO strings compare correctly).
+  const passDates = (b: Booking) => (!from || b.checkout >= from) && (!to || b.checkin <= to);
+  const filtered = all.filter((b) => passSearch(b) && passChannel(b) && passRoom(b) && passStatus(b) && passDates(b));
+  const sorted = [...filtered].sort((a, z) =>
+    sort === "booked" ? Date.parse(z.createdAt) - Date.parse(a.createdAt)
+    : sort === "checkin" ? a.checkin.localeCompare(z.checkin)
+    : z.checkin.localeCompare(a.checkin));
+  const pg = usePaged(sorted, 10);
   // Each filter's counts reflect every OTHER active filter, so the numbers always match what's shown.
-  const countFor = (k: string) => all.filter((b) => passSearch(b) && passChannel(b) && passRoom(b) && (k === "all" || cat(b) === k)).length;
-  const channelCount = (c: string) => all.filter((b) => passSearch(b) && passRoom(b) && passStatus(b) && (c === "all" || channelOf(b) === c)).length;
-  const cols = "112px 1.25fr 1fr 0.95fr 0.7fr 0.8fr 70px";
+  const countFor = (k: string) => all.filter((b) => passSearch(b) && passChannel(b) && passRoom(b) && passDates(b) && (k === "all" || cat(b) === k)).length;
+  const channelCount = (c: string) => all.filter((b) => passSearch(b) && passRoom(b) && passStatus(b) && passDates(b) && (c === "all" || channelOf(b) === c)).length;
+  const cols = "104px 1.2fr 1.15fr 1fr 0.95fr 0.65fr 0.8fr 64px";
   const tabs: [string, string][] = [["all", "All"], ["upcoming", "Upcoming"], ["inhouse", "In-house"], ["past", "Past"], ["cancelled", "Cancelled"]];
   const channels: [typeof channel, string][] = [["all", "All"], ["online", "Online"], ["manual", "Manual"]];
 
@@ -56,6 +67,19 @@ export function Bookings({ openModal, reload }: { openModal: (t: string) => void
           <option value="all">All rooms</option>
           {roomNames.map((rn) => <option key={rn} value={rn}>{rn}</option>)}
         </select>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }} title="Show stays within these dates">
+          <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); pg.setPage(1); }} aria-label="Stay from" style={{ padding: "8px 10px", fontSize: 13, borderRadius: 9, border: "1px solid var(--line)", background: "var(--bg-elev)", color: from ? "var(--ink)" : "var(--ink-mute)" }} />
+          <span className="mute" style={{ fontSize: 12 }}>→</span>
+          <input type="date" value={to} min={from || undefined} onChange={(e) => { setTo(e.target.value); pg.setPage(1); }} aria-label="Stay to" style={{ padding: "8px 10px", fontSize: 13, borderRadius: 9, border: "1px solid var(--line)", background: "var(--bg-elev)", color: to ? "var(--ink)" : "var(--ink-mute)" }} />
+          {(from || to) && (
+            <button onClick={() => { setFrom(""); setTo(""); pg.setPage(1); }} aria-label="Clear dates" style={{ width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", color: "var(--ink-mute)", border: "1px solid var(--line)" }}><Icons.Close size={12} /></button>
+          )}
+        </div>
+        <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} title="Sort order" style={{ marginLeft: "auto", padding: "9px 12px", fontSize: 13, borderRadius: 9, border: "1px solid var(--line)", background: "var(--bg-elev)", color: "var(--ink)" }}>
+          <option value="booked">Newest booked first</option>
+          <option value="checkin">Check-in · earliest</option>
+          <option value="checkin-desc">Check-in · latest</option>
+        </select>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         {tabs.map(([k, l]) => (
@@ -72,10 +96,10 @@ export function Bookings({ openModal, reload }: { openModal: (t: string) => void
           ))}
         </div>
       </div>
-      <ScrollX min={720}>
+      <ScrollX min={880}>
       <div className="card-clean" style={{ background: "var(--bg-elev)", borderRadius: 12, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: cols, padding: "14px 20px", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-mute)", borderBottom: "1px solid var(--line-soft)", background: "var(--bg-card)" }}>
-          <div>Ref</div><div>Guest</div><div>Stay</div><div>Room</div><div>Total</div><div>Status</div><div></div>
+          <div>Ref</div><div>Guest</div><div>Email</div><div>Stay</div><div>Room</div><div>Total</div><div>Status</div><div></div>
         </div>
         {pg.slice.map((b, i) => (
           <div key={b.ref} onClick={() => setDetail(b)} title="View details" style={{ display: "grid", gridTemplateColumns: cols, padding: "13px 20px", fontSize: 13, borderBottom: i < pg.slice.length - 1 ? "1px solid var(--line-soft)" : "none", alignItems: "center", cursor: "pointer" }}>
@@ -87,6 +111,7 @@ export function Bookings({ openModal, reload }: { openModal: (t: string) => void
                 <span>{b.source || "Website"}{b.bookedBy ? ` · by ${b.bookedBy}` : ""}</span>
               </div>
             </div>
+            <div style={{ color: "var(--ink-soft)", fontSize: 12, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.email || undefined}>{b.email || "—"}</div>
             <div style={{ color: "var(--ink-soft)" }}>{b.stay}</div>
             <div style={{ color: "var(--ink-soft)" }}>{b.room}</div>
             <div style={{ fontFamily: "var(--serif)" }}>{money(b.total)}</div>
