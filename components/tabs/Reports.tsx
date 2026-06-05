@@ -17,16 +17,16 @@ export function Reports() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
         <Panel title="Revenue by source"><SourcePie slices={ov.sources} /></Panel>
         <Panel title={`Avg length of stay · ${d.avgStay} nights`}><BarChart data={ov.revenueSeries.map((s) => ({ label: s.label[0], value: s.value }))} /></Panel>
-        <Panel title="Top countries">
-          {d.topCountries.map((c) => {
-            const max = d.topCountries[0]?.revNum || 1;
+        <Panel title="Top guests by lifetime value">
+          {d.topGuests.map((g) => {
+            const max = d.topGuests[0]?.revNum || 1;
             return (
-              <div key={c.country} style={{ display: "grid", gridTemplateColumns: "130px 1fr 80px", gap: 14, padding: "10px 0", fontSize: 13, alignItems: "center" }}>
-                <span>{c.country}</span>
+              <div key={g.name} style={{ display: "grid", gridTemplateColumns: "130px 1fr 80px", gap: 14, padding: "10px 0", fontSize: 13, alignItems: "center" }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</span>
                 <div style={{ height: 4, background: "var(--line-soft)", borderRadius: 999 }}>
-                  <div style={{ width: `${(c.revNum / max) * 100}%`, height: "100%", background: "var(--accent)" }} />
+                  <div style={{ width: `${(g.revNum / max) * 100}%`, height: "100%", background: "var(--accent)" }} />
                 </div>
-                <span style={{ textAlign: "right", color: "var(--ink-soft)" }}>{c.rev}</span>
+                <span style={{ textAlign: "right", color: "var(--ink-soft)" }}>{g.rev}</span>
               </div>
             );
           })}

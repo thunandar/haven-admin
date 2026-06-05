@@ -16,10 +16,14 @@ const ICON_CHOICES: (keyof typeof Icons)[] = [
 
 export function Settings() {
   const [items, setItems] = useState<GoodToKnow[] | null>(null);
+  const [payNowDiscount, setPayNowDiscount] = useState<string>("10");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.hotel().then((h) => setItems(h.goodToKnow ?? [])).catch(() => setItems([]));
+    api.hotel().then((h) => {
+      setItems(h.goodToKnow ?? []);
+      setPayNowDiscount(String(h.payNowDiscount ?? 10));
+    }).catch(() => setItems([]));
   }, []);
 
   if (!items) return <Loading />;
@@ -33,11 +37,17 @@ export function Settings() {
   const save = async () => {
     const cleaned = items.map((it) => ({ ...it, title: it.title.trim(), text: it.text.trim() }));
     if (cleaned.some((it) => !it.title)) { toast("Each item needs a title.", "error"); return; }
+    const discount = Number(payNowDiscount);
+    if (!Number.isInteger(discount) || discount < 0 || discount > 50) {
+      toast("Pay-now discount must be a whole number between 0 and 50.", "error");
+      return;
+    }
     setBusy(true);
     try {
-      const h = await api.updateHotel({ goodToKnow: cleaned });
+      const h = await api.updateHotel({ goodToKnow: cleaned, payNowDiscount: discount });
       setItems(h.goodToKnow ?? []);
-      toast("“Good to know” saved — your booking site is updated.");
+      setPayNowDiscount(String(h.payNowDiscount ?? discount));
+      toast("Settings saved — your booking site is updated.");
     } catch (e) {
       toast((e as Error).message, "error");
     } finally {
@@ -52,6 +62,30 @@ export function Settings() {
           {busy ? "Saving…" : "Save changes"}
         </button>
       } />
+      <Panel title="Rates & payment">
+        <p className="soft" style={{ fontSize: 13, marginTop: -6, marginBottom: 14 }}>
+          Guests choose between paying at the property (free cancellation, card held as guarantee) and prepaying online at a discount (non-refundable, charged at booking).
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <label style={{ display: "block" }}>
+            <span style={mbLabel}>Pay-now discount (%)</span>
+            <input
+              type="number" min={0} max={50} step={1}
+              style={{ ...mbInput, width: 120 }}
+              value={payNowDiscount}
+              onChange={(e) => setPayNowDiscount(e.target.value)}
+            />
+          </label>
+          <span className="mute" style={{ fontSize: 12, maxWidth: 380, lineHeight: 1.5 }}>
+            {Number(payNowDiscount) === 0
+              ? "0% — the pay-now option is hidden; every booking pays at the property."
+              : `A $400/night room shows ${"$" + Math.round(400 * (1 - (Number(payNowDiscount) || 0) / 100))}/night on the prepaid rate. Typical range is 10–15%.`}
+          </span>
+        </div>
+      </Panel>
+
+      <div style={{ height: 18 }} />
+
       <Panel title="“Good to know”" action={
         <button className="btn btn-outline" onClick={add} disabled={items.length >= 8} style={{ padding: "7px 14px", fontSize: 12, opacity: items.length >= 8 ? 0.5 : 1 }}>+ Add item</button>
       }>

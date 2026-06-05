@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Icons } from "../icons";
 import { AdminHeader, Panel, usePaged, Pagination, ScrollX, Modal, ModalHead, MBField, mbInput, Avatar, Loading } from "../ui";
 import { api, type Staff as StaffMember } from "../../lib/api";
+import { AREAS, ROLE_PERMS } from "../../lib/perms";
+import { toast } from "../../lib/toast";
 
 export function Staff() {
   const [staff, setStaff] = useState<StaffMember[] | null>(null);
-  const [invite, setInvite] = useState(false);
+  const [adding, setAdding] = useState(false);
   const load = () => api.staff().then(setStaff).catch(() => {});
   useEffect(() => { load(); }, []);
   const pg = usePaged(staff || [], 10);
@@ -16,7 +17,7 @@ export function Staff() {
   return (
     <div>
       <AdminHeader t="Staff & access" sub="Team and roles" action={
-        <button className="btn btn-primary" onClick={() => setInvite(true)} style={{ padding: "9px 16px", fontSize: 13 }}>+ Invite member</button>
+        <button className="btn btn-primary" onClick={() => setAdding(true)} style={{ padding: "9px 16px", fontSize: 13 }}>+ Add member</button>
       } />
       <Panel title={`Team · ${staff.length}`}>
         <ScrollX min={620}>
@@ -38,53 +39,63 @@ export function Staff() {
         </ScrollX>
         <Pagination pg={pg} noun="members" />
       </Panel>
-      {invite && <InviteModal onClose={() => setInvite(false)} onSaved={load} />}
+      {adding && <AddMemberModal onClose={() => setAdding(false)} onSaved={load} />}
     </div>
   );
 }
 
-function InviteModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ name: "", email: "", role: "Front desk", perms: "Bookings · Guests" });
+const DEFAULT_ROLE = "Front desk";
+
+function AddMemberModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({ name: "", email: "", role: DEFAULT_ROLE });
+  const [perms, setPerms] = useState<string[]>(ROLE_PERMS[DEFAULT_ROLE]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState("");
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+  // Picking a role suggests its usual access; chips stay editable per person.
+  const setRole = (role: string) => { setF((p) => ({ ...p, role })); setPerms(ROLE_PERMS[role] || []); };
+  const toggle = (key: string) => setPerms((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]));
   const submit = async () => {
     if (!f.name.trim() || !f.email.trim()) { setErr("Name and a valid email are required."); return; }
+    if (!perms.length) { setErr("Pick at least one access area."); return; }
     setBusy(true); setErr("");
     try {
-      const r = await api.invite(f);
+      await api.addStaff({ ...f, perms });
       onSaved();
-      setNote(r.emailed ? `Invite emailed to ${f.email}.` : `${f.name} added. (Email is in demo mode — no message sent.)`);
+      toast(`${f.name.trim()} added to the team.`);
+      onClose();
     } catch (e) { setErr((e as Error).message); setBusy(false); }
   };
-  if (note) {
-    return (
-      <Modal onClose={onClose} width={420}>
-        <div style={{ padding: "40px 30px", textAlign: "center" }}>
-          <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent-deep)", display: "grid", placeItems: "center", margin: "0 auto 16px" }}><Icons.Check size={24} stroke={2} /></div>
-          <h2 className="serif" style={{ fontSize: 24, marginBottom: 8 }}>Invitation sent</h2>
-          <p className="soft" style={{ fontSize: 13, marginBottom: 22 }}>{note}</p>
-          <button className="btn btn-primary" onClick={onClose} style={{ padding: "10px 24px" }}>Done</button>
-        </div>
-      </Modal>
-    );
-  }
   return (
     <Modal onClose={onClose} width={520}>
-      <ModalHead t="Invite a member" sub="Staff & access" onClose={onClose} />
+      <ModalHead t="Add a member" sub="Staff & access" onClose={onClose} />
       <div style={{ padding: "22px 26px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <MBField label="Full name" full><input style={mbInput} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Giulia Ferrara" /></MBField>
         <MBField label="Email" full><input type="email" style={mbInput} value={f.email} onChange={(e) => set("email", e.target.value)} placeholder="name@maisondesel.it" /></MBField>
-        <MBField label="Role">
-          <select style={mbInput} value={f.role} onChange={(e) => set("role", e.target.value)}>{["Front desk", "Manager", "Housekeeping", "Concierge", "Maintenance", "Night manager", "Kitchen"].map((o) => <option key={o}>{o}</option>)}</select>
+        <MBField label="Role" full>
+          <select style={mbInput} value={f.role} onChange={(e) => setRole(e.target.value)}>{Object.keys(ROLE_PERMS).map((o) => <option key={o}>{o}</option>)}</select>
         </MBField>
-        <MBField label="Access"><input style={mbInput} value={f.perms} onChange={(e) => set("perms", e.target.value)} /></MBField>
+        <MBField label="Access" full>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {AREAS.map((a) => {
+              const on = perms.includes(a.key);
+              return (
+                <button key={a.key} type="button" onClick={() => toggle(a.key)} style={{
+                  padding: "7px 13px", borderRadius: 999, fontSize: 12.5, cursor: "pointer",
+                  border: `1px solid ${on ? "var(--accent-deep)" : "var(--line)"}`,
+                  background: on ? "var(--accent-soft)" : "var(--bg-card)",
+                  color: on ? "var(--accent-deep)" : "var(--ink-soft)",
+                }}>{a.label}</button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--ink-mute)", marginTop: 8 }}>They&apos;ll only see the portal sections selected above.</div>
+        </MBField>
         {err && <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--warm)" }}>{err}</div>}
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "16px 26px", borderTop: "1px solid var(--line-soft)" }}>
         <button className="btn btn-outline" onClick={onClose} style={{ padding: "10px 18px", fontSize: 13 }}>Cancel</button>
-        <button className="btn btn-primary" onClick={submit} disabled={busy} style={{ padding: "10px 22px", fontSize: 13, opacity: busy ? 0.6 : 1 }}>{busy ? "Sending…" : "Send invite"}</button>
+        <button className="btn btn-primary" onClick={submit} disabled={busy} style={{ padding: "10px 22px", fontSize: 13, opacity: busy ? 0.6 : 1 }}>{busy ? "Adding…" : "Add member"}</button>
       </div>
     </Modal>
   );

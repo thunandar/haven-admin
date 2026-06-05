@@ -6,9 +6,10 @@ import { Icons } from "./icons";
 import Login from "./login";
 import { BookingModal, AddRoomModal, RoomDetailModal } from "./modals";
 import {
-  Overview, Bookings, RoomsInv, Pricing, GuestsTab, ReviewsTab, Staff, Promos, NewPromoModal, Reports, Settings,
+  Overview, Bookings, RoomsInv, AvailabilityTab, Pricing, GuestsTab, ReviewsTab, Staff, Promos, NewPromoModal, Reports, Settings,
 } from "./tabs";
 import { api, clearToken, getToken, type AuthUser, type Room } from "../lib/api";
+import { can } from "../lib/perms";
 import { Toaster } from "../lib/toast";
 import { useIsMobile } from "../lib/use-responsive";
 
@@ -18,6 +19,7 @@ const NAV: [string, string, keyof typeof Icons][] = [
   ["overview", "Overview", "Grid"],
   ["bookings", "Bookings", "Calendar"],
   ["rooms", "Rooms & inventory", "Bed"],
+  ["availability", "Availability", "CalendarDays"],
   ["pricing", "Pricing", "Sliders"],
   ["guests", "Guests", "Users"],
   ["reviews", "Reviews", "Quote"],
@@ -43,7 +45,7 @@ function SidebarBody({ user, tab, setTab, onSignOut }: { user: AuthUser; tab: st
         <div style={{ fontSize: 11, color: "#8A8474" }}>Praiano, Italy</div>
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>
-        {NAV.map(([k, l, ic]) => {
+        {NAV.filter(([k]) => k === "overview" || can(user, k)).map(([k, l, ic]) => {
           const I = Icons[ic];
           const on = tab === k;
           return (
@@ -105,11 +107,27 @@ export default function AdminApp() {
   if (!ready) return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "var(--ink-mute)" }}>Loading…</div>;
   if (!user) return <Login onLogin={(u) => { setUser(u); setReady(true); }} />;
 
-  const Content = (
+  // RBAC: hidden nav items can still be reached by URL — show a notice instead.
+  const allowed = tab === "overview" || can(user, tab);
+  const Content = !allowed ? (
+    <div style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>
+      <div style={{ textAlign: "center", maxWidth: 360 }}>
+        <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--bg-elev)", border: "1px solid var(--line-soft)", display: "grid", placeItems: "center", margin: "0 auto 16px", color: "var(--ink-mute)" }}>
+          <Icons.Shield size={22} stroke={1.6} />
+        </div>
+        <h2 className="serif" style={{ fontSize: 24, marginBottom: 8 }}>No access</h2>
+        <p className="soft" style={{ fontSize: 13, marginBottom: 20 }}>
+          Your account doesn&apos;t include {NAV.find(([k]) => k === tab)?.[1] || "this area"}. Ask the owner to update your access in Staff &amp; access.
+        </p>
+        <button className="btn btn-primary" onClick={() => setTab("overview")} style={{ padding: "10px 22px", fontSize: 13 }}>Back to overview</button>
+      </div>
+    </div>
+  ) : (
     <>
-      {tab === "overview" && <Overview openModal={openModal} reload={reload} />}
+      {tab === "overview" && <Overview user={user} openModal={openModal} reload={reload} />}
       {tab === "bookings" && <Bookings openModal={openModal} reload={reload} />}
       {tab === "rooms" && <RoomsInv openModal={openModal} openRoom={(r) => setModal({ type: "room", room: r })} reload={reload} />}
+      {tab === "availability" && <AvailabilityTab reload={reload} />}
       {tab === "pricing" && <Pricing />}
       {tab === "guests" && <GuestsTab />}
       {tab === "reviews" && <ReviewsTab />}

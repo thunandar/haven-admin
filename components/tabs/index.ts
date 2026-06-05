@@ -2,6 +2,7 @@
 export { Overview } from "./Overview";
 export { Bookings } from "./Bookings";
 export { RoomsInv } from "./Rooms";
+export { AvailabilityTab } from "./Availability";
 export { GuestsTab } from "./Guests";
 export { ReviewsTab } from "./Reviews";
 export { Staff } from "./Staff";

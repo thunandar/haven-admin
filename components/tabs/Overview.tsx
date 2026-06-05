@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { Icons } from "../icons";
 import { AdminHeader, Panel, KPI, BarChart, SourcePie, Loading } from "../ui";
-import { api, type Overview as OverviewData } from "../../lib/api";
+import { api, type AuthUser, type Overview as OverviewData } from "../../lib/api";
+import { can } from "../../lib/perms";
 
-export function Overview({ openModal, reload }: { openModal: (t: string) => void; reload: number }) {
+export function Overview({ user, openModal, reload }: { user: AuthUser; openModal: (t: string) => void; reload: number }) {
   const [d, setD] = useState<OverviewData | null>(null);
   const [acted, setActed] = useState<Record<string, string>>({});
   const [arrAll, setArrAll] = useState(false);
@@ -26,7 +27,7 @@ export function Overview({ openModal, reload }: { openModal: (t: string) => void
       <AdminHeader t={dateLabel} sub="Overview" action={
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn btn-outline" style={{ padding: "9px 14px", fontSize: 13 }}>Last 30 days</button>
-          <button className="btn btn-primary" onClick={() => openModal("booking")} style={{ padding: "9px 16px", fontSize: 13 }}>+ Manual booking</button>
+          {can(user, "bookings") && <button className="btn btn-primary" onClick={() => openModal("booking")} style={{ padding: "9px 16px", fontSize: 13 }}>+ Manual booking</button>}
         </div>
       } />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
@@ -41,7 +42,7 @@ export function Overview({ openModal, reload }: { openModal: (t: string) => void
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, color: "#E4E2D8", lineHeight: 1.55 }}>{d.insight.text}</div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button className="btn" onClick={() => openModal("promo")} style={{ background: "var(--bg)", color: "var(--ink)", padding: "8px 14px", fontSize: 12 }}>Draft promo</button>
+            {can(user, "promos") && <button className="btn" onClick={() => openModal("promo")} style={{ background: "var(--bg)", color: "var(--ink)", padding: "8px 14px", fontSize: 12 }}>Draft promo</button>}
             <span style={{ fontSize: 11, color: "#8A8474", alignSelf: "center" }}>{d.insight.ai ? "Live · Claude" : "Demo insight"}</span>
           </div>
         </div>

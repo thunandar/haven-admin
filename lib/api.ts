@@ -8,13 +8,14 @@ export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
 // ---- Types ----
-export interface AuthUser { id: string; email: string; name: string; role: string; isOwner: boolean }
+export interface AuthUser { id: string; email: string; name: string; role: string; isOwner: boolean; perms: string[] }
 
 export interface GoodToKnow { icon: string; title: string; text: string }
 export interface Hotel {
   id: string; name: string; tagline: string; location: string; country: string;
   rating: number; reviews: number; hero: string; address: string; email: string; phone: string;
   amenities: string[]; goodToKnow: GoodToKnow[];
+  payNowDiscount: number; // prepaid-rate % off; 0 disables pay now on the guest site
 }
 
 export interface Room {
@@ -38,18 +39,25 @@ export interface Overview {
   departures: { ref: string; name: string; room: string; status: string }[];
   insight: { text: string; ai: boolean };
 }
-export interface Guest { name: string; email: string; country: string; stays: number; ltv: number; ltvLabel: string; rating: string; tier: string }
+// Computed by the API from the bookings table (stays/ltv/tier) + the guest's
+// own reviews (rating — null when they haven't left one).
+export interface Guest { name: string; email: string; stays: number; ltv: number; ltvLabel: string; rating: string | null; tier: string }
 export interface Review { id: string; guest: string; email: string; rating: number; roomName: string; text: string; reply: string; draft: string; featured: boolean; createdAt: string }
 export interface ReplyResult extends Review { emailed: boolean; sentTo: string }
 export interface Staff { id: string; n: string; role: string; perms: string; email: string; last: string; you: boolean }
-export interface Promo { id: string; code: string; title: string; status: string; redemptions: number; attributed: number; attributedLabel: string }
+export interface Promo {
+  id: string; code: string; title: string;
+  startsAt: string | null; endsAt: string | null; paused: boolean;
+  status: "Active" | "Scheduled" | "Expired" | "Paused"; windowLabel: string; // derived server-side from the dates
+  redemptions: number; attributed: number; attributedLabel: string;
+}
 export interface PriceSuggestion {
   id: string; roomId: string; room: string; when: string; change: string;
   why: string; lift: string; positive: boolean; target: number; estImpact: number;
 }
 export interface Pricing { enabled: boolean; suggestions: PriceSuggestion[] }
 export interface Reports {
-  topCountries: { country: string; rev: string; revNum: number }[];
+  topGuests: { name: string; rev: string; revNum: number }[];
   leadTime: { label: string; v: number }[];
   avgStay: string;
 }
@@ -87,7 +95,7 @@ export const api = {
   me: () => req<AuthUser>("/auth/me"),
   overview: () => req<Overview>("/admin/overview"),
   hotel: () => req<Hotel>("/admin/hotel"),
-  updateHotel: (body: { goodToKnow: GoodToKnow[] }) => req<Hotel>("/admin/hotel", { method: "PATCH", body: JSON.stringify(body) }),
+  updateHotel: (body: { goodToKnow?: GoodToKnow[]; payNowDiscount?: number }) => req<Hotel>("/admin/hotel", { method: "PATCH", body: JSON.stringify(body) }),
   bookings: () => req<{ bookings: Booking[]; counts: Record<string, number> }>("/admin/bookings"),
   createBooking: (body: Record<string, unknown>) => req<Booking>("/admin/bookings", { method: "POST", body: JSON.stringify(body) }),
   cancelBooking: (ref: string) => req<Booking>(`/admin/bookings/${ref}/cancel`, { method: "POST" }),
@@ -101,9 +109,10 @@ export const api = {
   sendReply: (id: string, reply?: string) => req<ReplyResult>(`/admin/reviews/${id}/reply`, { method: "POST", body: JSON.stringify({ reply }) }),
   featureReview: (id: string, featured: boolean) => req<Review>(`/admin/reviews/${id}/feature`, { method: "POST", body: JSON.stringify({ featured }) }),
   staff: () => req<Staff[]>("/admin/staff"),
-  invite: (body: Record<string, unknown>) => req<Staff & { emailed: boolean }>("/admin/staff", { method: "POST", body: JSON.stringify(body) }),
+  addStaff: (body: { name: string; email: string; role: string; perms: string[] }) => req<Staff>("/admin/staff", { method: "POST", body: JSON.stringify(body) }),
   promos: () => req<Promo[]>("/admin/promos"),
   addPromo: (body: Record<string, unknown>) => req<Promo>("/admin/promos", { method: "POST", body: JSON.stringify(body) }),
+  pausePromo: (id: string, paused: boolean) => req<Promo>(`/admin/promos/${id}`, { method: "PATCH", body: JSON.stringify({ paused }) }),
   reports: () => req<Reports>("/admin/reports"),
   pricing: () => req<Pricing>("/admin/pricing"),
   approvePrice: (roomId: string, target: number) =>
