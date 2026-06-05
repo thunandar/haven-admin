@@ -47,7 +47,8 @@ export function Staff() {
 const DEFAULT_ROLE = "Front desk";
 
 function AddMemberModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ name: "", email: "", role: DEFAULT_ROLE });
+  const [f, setF] = useState({ name: "", email: "", role: DEFAULT_ROLE, password: "" });
+  const [showPw, setShowPw] = useState(false);
   const [perms, setPerms] = useState<string[]>(ROLE_PERMS[DEFAULT_ROLE]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -57,6 +58,7 @@ function AddMemberModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const toggle = (key: string) => setPerms((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]));
   const submit = async () => {
     if (!f.name.trim() || !f.email.trim()) { setErr("Name and a valid email are required."); return; }
+    if (f.password.length < 8) { setErr("The password needs at least 8 characters."); return; }
     if (!perms.length) { setErr("Pick at least one access area."); return; }
     setBusy(true); setErr("");
     try {
@@ -72,6 +74,13 @@ function AddMemberModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       <div style={{ padding: "22px 26px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <MBField label="Full name" full><input style={mbInput} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Giulia Ferrara" /></MBField>
         <MBField label="Email" full><input type="email" style={mbInput} value={f.email} onChange={(e) => set("email", e.target.value)} placeholder="name@maisondesel.it" /></MBField>
+        <MBField label="Password" full>
+          <div style={{ position: "relative" }}>
+            <input type={showPw ? "text" : "password"} style={mbInput} value={f.password} onChange={(e) => set("password", e.target.value)} placeholder="At least 8 characters" />
+            <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: "var(--ink-mute)" }}>{showPw ? "Hide" : "Show"}</button>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--ink-mute)", marginTop: 8 }}>Share this email and password with them yourself — that&apos;s all they need to sign in.</div>
+        </MBField>
         <MBField label="Role" full>
           <select style={mbInput} value={f.role} onChange={(e) => setRole(e.target.value)}>{Object.keys(ROLE_PERMS).map((o) => <option key={o}>{o}</option>)}</select>
         </MBField>

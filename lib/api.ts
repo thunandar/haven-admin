@@ -27,7 +27,8 @@ export interface Room {
 export interface Booking {
   id: string; ref: string; guest: string; email: string; phone: string; room: string; roomId: string;
   stay: string; checkin: string; checkout: string; nights: number; adults: number; children: number;
-  total: number; status: string; baseStatus: string; color: string; source: string; bookedBy: string; payment: string; notes: string;
+  total: number; promoCode: string; discount: number; // promo applied at booking (discount already off total)
+  status: string; baseStatus: string; color: string; source: string; bookedBy: string; payment: string; notes: string;
   createdAt: string;
 }
 export interface Overview {
@@ -47,6 +48,7 @@ export interface ReplyResult extends Review { emailed: boolean; sentTo: string }
 export interface Staff { id: string; n: string; role: string; perms: string; email: string; last: string; you: boolean }
 export interface Promo {
   id: string; code: string; title: string;
+  discountPct: number; minNights: number; // the discount the code applies at booking
   startsAt: string | null; endsAt: string | null; paused: boolean;
   status: "Active" | "Scheduled" | "Expired" | "Paused"; windowLabel: string; // derived server-side from the dates
   redemptions: number; attributed: number; attributedLabel: string;
@@ -109,10 +111,11 @@ export const api = {
   sendReply: (id: string, reply?: string) => req<ReplyResult>(`/admin/reviews/${id}/reply`, { method: "POST", body: JSON.stringify({ reply }) }),
   featureReview: (id: string, featured: boolean) => req<Review>(`/admin/reviews/${id}/feature`, { method: "POST", body: JSON.stringify({ featured }) }),
   staff: () => req<Staff[]>("/admin/staff"),
-  addStaff: (body: { name: string; email: string; role: string; perms: string[] }) => req<Staff>("/admin/staff", { method: "POST", body: JSON.stringify(body) }),
+  addStaff: (body: { name: string; email: string; role: string; perms: string[]; password: string }) => req<Staff>("/admin/staff", { method: "POST", body: JSON.stringify(body) }),
   promos: () => req<Promo[]>("/admin/promos"),
   addPromo: (body: Record<string, unknown>) => req<Promo>("/admin/promos", { method: "POST", body: JSON.stringify(body) }),
   pausePromo: (id: string, paused: boolean) => req<Promo>(`/admin/promos/${id}`, { method: "PATCH", body: JSON.stringify({ paused }) }),
+  deletePromo: (id: string) => req<{ ok: boolean }>(`/admin/promos/${id}`, { method: "DELETE" }),
   reports: () => req<Reports>("/admin/reports"),
   pricing: () => req<Pricing>("/admin/pricing"),
   approvePrice: (roomId: string, target: number) =>

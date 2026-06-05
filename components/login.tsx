@@ -73,13 +73,13 @@ export default function Login({ onLogin }: { onLogin: (u: AuthUser) => void }) {
               <label style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--ink-soft)" }}>
                 <input type="checkbox" defaultChecked style={{ accentColor: "var(--accent)" }} /> Remember me
               </label>
-              <a href="#" style={{ color: "var(--accent)" }} onClick={(e) => e.preventDefault()}>Forgot password?</a>
+              {/* No self-serve reset — the owner manages passwords and shares them directly. */}
             </div>
             {err && <div style={{ fontSize: 13, color: "var(--warm)", marginBottom: 14 }}>{err}</div>}
             <button type="submit" className="btn btn-accent" disabled={busy} style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: 15, opacity: busy ? 0.6 : 1 }}>{busy ? "Signing in…" : "Sign in to portal"}</button>
           </form>
           <div style={{ marginTop: 22, fontSize: 12, color: "var(--ink-mute)", textAlign: "center", lineHeight: 1.6 }}>
-            Demo — any password works for a hotelier email.<br />Try <span className="kbd">thunandarayemin228@gmail.com</span>
+            Demo login — <span className="kbd">thunandarayemin228@gmail.com</span><br />password <span className="kbd">haven1234</span>
           </div>
         </div>
       </div>

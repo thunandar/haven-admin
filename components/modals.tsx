@@ -7,6 +7,19 @@ import { api, money, uploadImages, type Room, type Booking } from "../lib/api";
 import { useIsMobile } from "../lib/use-responsive";
 import { toast } from "../lib/toast";
 
+// A booking is "guaranteed" when a card is on file (guest-site bookings embed
+// "Visa •••• 4242" in the payment string) or money has already been taken.
+// Manual "Pay at property" / "Payment link sent" bookings have neither, so the
+// hotel carries the no-show risk until the guest pays or completes the link.
+// Card numbers are never typed into this portal — staff record the payment
+// state and the guest enters their own card via the site or a payment link.
+const isUnguaranteed = (payment: string) => payment === "Pay at property" || payment === "Payment link sent";
+
+const UNGUARANTEED_HINTS: Record<string, string> = {
+  "Pay at property": "No card on file — nothing backs this booking if the guest no-shows or cancels late. Take a deposit or send a payment link for cover.",
+  "Payment link sent": "The guest enters their card themselves via the secure link. The booking stays unguaranteed until they complete it.",
+};
+
 // ---------------- NEW / MANUAL BOOKING ----------------
 export function BookingModal({ rooms, onClose, onSaved }: { rooms: Room[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({
@@ -28,7 +41,7 @@ export function BookingModal({ rooms, onClose, onSaved }: { rooms: Room[]; onClo
     if (!f.name.trim() || nights < 1) { setErr("Please add a guest name and a valid date range."); return; }
     setBusy(true); setErr("");
     try {
-      const b = await api.createBooking({ ...f });
+      const b = await api.createBooking({ ...f, guest: f.name }); // API field is `guest`
       setDone(b.ref);
       onSaved();
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
@@ -82,9 +95,14 @@ export function BookingModal({ rooms, onClose, onSaved }: { rooms: Room[]; onClo
           </MBField>
           <MBField label="Payment">
             <select style={mbInput} value={f.payment} onChange={(e) => set("payment", e.target.value)}>
-              {["Paid in full", "Deposit paid", "Pay at property"].map((o) => <option key={o}>{o}</option>)}
+              {["Paid in full", "Deposit paid", "Pay at property", "Payment link sent"].map((o) => <option key={o}>{o}</option>)}
             </select>
           </MBField>
+          {isUnguaranteed(f.payment) && (
+            <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--warm)", lineHeight: 1.5, marginTop: -4 }}>
+              {UNGUARANTEED_HINTS[f.payment]}
+            </div>
+          )}
           <MBField label="Notes / special requests" full>
             <textarea rows={2} style={{ ...mbInput, resize: "vertical" }} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Late arrival, dietary needs, occasion…" />
           </MBField>
@@ -421,6 +439,11 @@ export function BookingDetailModal({ booking, onClose, onChanged }: { booking: B
 
   const guests = `${b.adults} adult${b.adults > 1 ? "s" : ""}${b.children ? ` · ${b.children} child${b.children > 1 ? "ren" : ""}` : ""}`;
 
+  // No-show risk only matters while the stay is still ahead — once the guest is
+  // in-house, past, or cancelled, the guarantee question is moot.
+  const upcoming = b.status === "Confirmed" || b.status === "Arriving today";
+  const unguaranteed = upcoming && isUnguaranteed(b.payment);
+
   return (
     <Modal onClose={onClose} width={600}>
       <ModalHead t={b.guest} sub="Reservation" onClose={onClose} />
@@ -444,10 +467,23 @@ export function BookingDetailModal({ booking, onClose, onChanged }: { booking: B
         <div className="eyebrow" style={{ marginBottom: 10 }}>Booking</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 24px" }}>
           <DField label="Total" value={money(b.total)} />
-          <DField label="Payment" value={b.payment} />
+          {b.discount > 0 && <DField label="Promo" value={`${b.promoCode} · −${money(b.discount)}`} />}
+          <DField label="Payment" value={
+            unguaranteed ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {b.payment}
+                <span title={UNGUARANTEED_HINTS[b.payment]} style={{ padding: "2px 9px", borderRadius: 999, fontSize: 10.5, background: "#F5E6DA", color: "#82391C", whiteSpace: "nowrap" }}>Unguaranteed</span>
+              </span>
+            ) : b.payment
+          } />
           <DField label="Source" value={`${b.source || "Website"}${b.bookedBy ? ` · by ${b.bookedBy}` : ""}`} />
           {b.notes && <DField label="Notes" value={b.notes} full />}
         </div>
+        {unguaranteed && (
+          <div style={{ fontSize: 12, color: "var(--warm)", lineHeight: 1.5, marginTop: 14 }}>
+            {UNGUARANTEED_HINTS[b.payment]}
+          </div>
+        )}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 26px", borderTop: "1px solid var(--line-soft)" }}>
         {active && !confirmCancel ? (
